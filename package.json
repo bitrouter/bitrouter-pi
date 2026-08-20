@@ -1,0 +1,52 @@
+{
+  "name": "@bitrouter/pi",
+  "version": "0.1.0",
+  "description": "BitRouter provider extension for the pi coding agent",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "BitRouterAI",
+  "homepage": "https://github.com/bitrouter/bitrouter-pi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bitrouter/bitrouter-pi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bitrouter/bitrouter-pi/issues"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-agent",
+    "bitrouter",
+    "llm",
+    "ai-gateway",
+    "provider"
+  ],
+  "pi": {
+    "extensions": ["./extensions"],
+    "skills": ["./skills"]
+  },
+  "files": [
+    "extensions",
+    "skills",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    "./package.json": "./package.json",
+    "./extensions/bitrouter": "./extensions/bitrouter.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.80.1",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}

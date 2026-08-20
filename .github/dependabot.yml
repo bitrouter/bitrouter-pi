@@ -1,0 +1,13 @@
+# The pi harness (@earendil-works/pi-coding-agent) is a dev dependency here: its
+# types are the contract this extension is written against, so a bump is the
+# signal to re-check compatibility. CI runs typecheck + tests on the bump PR.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule: { interval: "weekly" }
+    labels: ["harness-update"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule: { interval: "monthly" }
