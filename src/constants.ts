@@ -19,4 +19,19 @@ export const bitrouter = {
   },
 } as const;
 
+/** The pi provider id this package registers. */
+export const PROVIDER_ID = "bitrouter";
+
+/**
+ * The model id that hands model choice back to BitRouter. Paired with
+ * {@link PROVIDER_ID} this is the `bitrouter/auto` route a user selects, and
+ * it travels to the gateway as the request's `model` field.
+ *
+ * BitRouter serves the route; this package only advertises it. Until the
+ * catalog lists `auto` itself, `autoModel()` synthesizes the entry so the
+ * route is selectable — and once the catalog does list it, the served entry
+ * wins and carries the real metadata.
+ */
+export const AUTO_MODEL_ID = "auto";
+
 export type BitrouterConstants = typeof bitrouter;

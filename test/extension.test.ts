@@ -5,9 +5,13 @@ import bitrouterExtension from "../extensions/bitrouter.js";
 /**
  * Behavioral test for the composed provider extension: it must register the
  * `bitrouter` provider with a configured apiKey (so pi surfaces its models) and,
- * on session start, select a capable default model only when the user has not
- * already chosen one. This is the Phase 1 "launch straight into a working model,
- * no /login" guarantee.
+ * on session start, select a default model only when the user has not already
+ * chosen one. This is the Phase 1 "launch straight into a working model, no
+ * /login" guarantee.
+ *
+ * Every catalog the extension registers leads with the `auto` route, so a
+ * three-model gateway registers four entries and the default selection is
+ * `auto` — the rest of the catalog stays selectable behind it.
  */
 
 interface TestCtx {
@@ -99,7 +103,9 @@ describe("bitrouter provider extension (local)", () => {
       apiKey: "bitrouter-local",
       authHeader: true,
     });
-    expect(config.models).toHaveLength(3);
+    // three discovered + the auto route at the head
+    expect(config.models).toHaveLength(4);
+    expect(config.models[0].id).toBe("auto");
   });
 
   it("uses an explicit BITROUTER_API_KEY when present", async () => {
@@ -111,16 +117,17 @@ describe("bitrouter provider extension (local)", () => {
     });
   });
 
-  it("selects a capable default model on session start when none is chosen", async () => {
+  it("selects the auto route on session start when none is chosen", async () => {
     const t = makePi();
     await bitrouterExtension(t.pi);
     expect(t.on).toHaveBeenCalledWith("session_start", expect.any(Function));
 
-    const found = { id: "claude-opus-4-8", provider: "bitrouter" };
+    const found = { id: "auto", provider: "bitrouter" };
     const find = vi.fn(() => found);
     await t.getSessionStart()!({}, { model: undefined, modelRegistry: { find } });
 
-    expect(find).toHaveBeenCalledWith("bitrouter", "claude-opus-4-8");
+    // Deferring the choice to BitRouter is the point of routing through it.
+    expect(find).toHaveBeenCalledWith("bitrouter", "auto");
     expect(t.setModel).toHaveBeenCalledWith(found);
   });
 
@@ -154,7 +161,7 @@ describe("bitrouter provider extension (local)", () => {
     expect(t.setModel).toHaveBeenCalledWith(fresh);
   });
 
-  it("does not register when an explicit local daemon returns no models", async () => {
+  it("still offers the auto route when an explicit local daemon lists nothing", async () => {
     process.env.BITROUTER_TARGET = "local"; // force local; skip the smart probe
     globalThis.fetch = vi.fn(async () => ({
       ok: true,
@@ -162,6 +169,21 @@ describe("bitrouter provider extension (local)", () => {
     })) as unknown as typeof fetch;
     const t = makePi();
     await bitrouterExtension(t.pi);
+    // The daemon answered — it is up, it just has no catalog to show. Routing
+    // is the gateway's job, so `bitrouter/auto` stays selectable.
+    const config = t.registerProvider.mock.calls[0][1];
+    expect(config.models.map((m: { id: string }) => m.id)).toEqual(["auto"]);
+  });
+
+  it("registers nothing when an explicit local daemon is unreachable", async () => {
+    process.env.BITROUTER_TARGET = "local";
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error("ECONNREFUSED");
+    }) as unknown as typeof fetch;
+    const t = makePi();
+    await bitrouterExtension(t.pi);
+    // No daemon at all: a provider whose every request fails is worse than no
+    // provider, so this is the one case that registers nothing.
     expect(t.registerProvider).not.toHaveBeenCalled();
   });
 });
@@ -185,7 +207,7 @@ describe("smart default (no explicit BITROUTER_TARGET)", () => {
     await bitrouterExtension(t.pi);
     const config = t.registerProvider.mock.calls[0][1];
     expect(config.oauth?.name).toBe("BitRouter"); // cloud path
-    expect(config.models).toEqual([]);
+    expect(config.models.map((m: { id: string }) => m.id)).toEqual(["auto"]);
   });
 });
 
@@ -203,7 +225,9 @@ describe("bitrouter provider extension (cloud)", () => {
     expect(t.registerProvider).toHaveBeenCalledTimes(1);
     const config = t.registerProvider.mock.calls[0][1];
     expect(config.oauth?.name).toBe("BitRouter");
-    expect(config.models).toEqual([]);
+    // The auto route is offered before any token exists; pi's getAvailable()
+    // still hides the provider until a credential resolves.
+    expect(config.models.map((m: { id: string }) => m.id)).toEqual(["auto"]);
     expect(config.apiKey).toBeUndefined(); // no token yet → /login supplies it
     expect(
       config.oauth.getApiKey({ access: "acc", refresh: "r", expires: 0 }),
@@ -218,7 +242,7 @@ describe("bitrouter provider extension (cloud)", () => {
     const config = t.registerProvider.mock.calls[0][1];
     expect(config.apiKey).toBe("brk_cloud");
     expect(config.authHeader).toBe(true);
-    expect(config.models).toHaveLength(3);
+    expect(config.models).toHaveLength(4); // three discovered + auto
     expect(config.oauth?.name).toBe("BitRouter");
   });
 
@@ -249,7 +273,8 @@ describe("bitrouter provider extension (cloud)", () => {
       expect(creds.access).toBe("acc_live");
       // login() re-registered the provider with the discovered catalog + token.
       const last = t.registerProvider.mock.calls.at(-1)![1];
-      expect(last.models).toHaveLength(3);
+      expect(last.models).toHaveLength(4); // three discovered + auto
+      expect(last.models[0].id).toBe("auto");
       expect(last.apiKey).toBe("acc_live");
     } finally {
       vi.useRealTimers();
@@ -295,7 +320,7 @@ describe("bitrouter provider extension (cloud)", () => {
     const config = t.registerProvider.mock.calls[0][1];
 
     const setWidget = vi.fn();
-    const model = { id: "claude-opus-4-8", provider: "bitrouter" };
+    const model = { id: "auto", provider: "bitrouter" };
     // session_start captures ctx.ui + registry and paints the banner (no catalog yet).
     await t.getSessionStart()!(
       {},
@@ -310,7 +335,6 @@ describe("bitrouter provider extension (cloud)", () => {
       },
     );
     expect(setWidget).toHaveBeenCalledWith("bitrouter-auth", expect.any(Array));
-    expect(t.setModel).not.toHaveBeenCalled(); // nothing to select pre-login
 
     vi.useFakeTimers();
     try {

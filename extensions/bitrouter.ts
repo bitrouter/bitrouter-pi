@@ -7,13 +7,22 @@ import { resolveTarget, type Target } from "../src/target.js";
 import { loadCloudToken } from "../src/credentials.js";
 import {
   mapDiscoveredModel,
+  withAutoModel,
   type DiscoveredModel,
   type PiModel,
 } from "../src/models.js";
+import { AUTO_MODEL_ID, PROVIDER_ID } from "../src/constants.js";
 import { selectDefaultModelId } from "../src/select.js";
 import { resolveOAuthConfig, deviceLogin, refreshCredentials } from "../src/oauth.js";
 
-/** Fetch + map BitRouter's `/v1/models` catalog. Throws on a non-OK response. */
+/**
+ * Fetch + map BitRouter's `/v1/models` catalog, with the auto route at the
+ * head. Throws on a non-OK response so the caller can tell "the gateway said
+ * no" from "the gateway has nothing".
+ *
+ * Entries without a usable string id are dropped rather than failing the whole
+ * listing — one malformed row should not cost the provider its whole catalog.
+ */
 async function discoverModels(
   baseUrl: string,
   apiKey: string | undefined,
@@ -22,8 +31,17 @@ async function discoverModels(
   if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
   const res = await fetch(`${baseUrl}/models`, { headers });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const payload = (await res.json()) as { data?: DiscoveredModel[] };
-  return (payload.data ?? []).map(mapDiscoveredModel);
+  const payload = (await res.json()) as { data?: unknown };
+  const rows = Array.isArray(payload.data)
+    ? payload.data.filter(
+        (m): m is DiscoveredModel =>
+          typeof m === "object" &&
+          m !== null &&
+          typeof (m as DiscoveredModel).id === "string" &&
+          (m as DiscoveredModel).id.length > 0,
+      )
+    : [];
+  return withAutoModel(rows).map(mapDiscoveredModel);
 }
 
 /** Widget key for the "not connected" login prompt (cloud, unauthenticated). */
@@ -57,7 +75,7 @@ async function selectDefault(
   ) {
     return;
   }
-  const model = ctx.modelRegistry.find("bitrouter", defaultModelId);
+  const model = ctx.modelRegistry.find(PROVIDER_ID, defaultModelId);
   if (model) await pi.setModel(model);
 }
 
@@ -120,11 +138,18 @@ async function registerLocal(
     );
     return;
   }
-  if (models.length === 0) {
-    console.error("[bitrouter] no models discovered; provider not registered");
-    return;
+  // `discoverModels` always leads with the auto route, so the catalog is never
+  // empty here — a daemon serving nothing still leaves `bitrouter/auto`
+  // selectable, and routing is the gateway's job rather than this extension's.
+  // An unreachable daemon is the one case that registers nothing: the `catch`
+  // above returns, because a provider whose every request fails is worse than
+  // no provider at all.
+  if (models.length === 1 && models[0].id === AUTO_MODEL_ID) {
+    console.error(
+      `[bitrouter] no models listed at ${target.baseUrl}/models; offering ${PROVIDER_ID}/${AUTO_MODEL_ID} alone`,
+    );
   }
-  pi.registerProvider("bitrouter", {
+  pi.registerProvider(PROVIDER_ID, {
     baseUrl: target.baseUrl,
     api: "openai-completions",
     apiKey,
@@ -156,7 +181,7 @@ async function registerCloud(
 
   const register = (apiKey: string | undefined, models: PiModel[]): void => {
     defaultModelId = selectDefaultModelId(models);
-    pi.registerProvider("bitrouter", {
+    pi.registerProvider(PROVIDER_ID, {
       baseUrl: target.baseUrl,
       api: "openai-completions",
       ...(apiKey ? { apiKey, authHeader: true } : {}),
@@ -168,7 +193,11 @@ async function registerCloud(
   const discoverAndRegister = async (
     token: string | undefined,
   ): Promise<void> => {
-    let models: PiModel[] = [];
+    // The auto route is present from the first registration, before any token
+    // exists: it is what the post-login `setModel` selects, and pi's
+    // `getAvailable()` still hides the provider until a credential resolves,
+    // so offering it early costs a user nothing.
+    let models: PiModel[] = withAutoModel([]).map(mapDiscoveredModel);
     if (token) {
       try {
         models = await discoverModels(target.baseUrl, token);
@@ -189,7 +218,7 @@ async function registerCloud(
       // select one here (the registered apiKey resolves the key immediately),
       // then drop the "not connected" banner.
       if (activeRegistry && defaultModelId) {
-        const model = activeRegistry.find("bitrouter", defaultModelId);
+        const model = activeRegistry.find(PROVIDER_ID, defaultModelId);
         if (model) await pi.setModel(model);
       }
       activeUi?.setWidget(AUTH_WIDGET_KEY, undefined);
@@ -214,11 +243,11 @@ async function registerCloud(
     // above had none). Resolve it now — pi auto-refreshes — and discover.
     let hasModels = ctx.modelRegistry
       .getAvailable()
-      .some((m) => m.provider === "bitrouter");
+      .some((m) => m.provider === PROVIDER_ID);
     if (!hasModels) {
       let token: string | undefined;
       try {
-        token = await ctx.modelRegistry.getApiKeyForProvider("bitrouter");
+        token = await ctx.modelRegistry.getApiKeyForProvider(PROVIDER_ID);
       } catch {
         token = undefined;
       }
@@ -226,7 +255,7 @@ async function registerCloud(
         await discoverAndRegister(token);
         hasModels = ctx.modelRegistry
           .getAvailable()
-          .some((m) => m.provider === "bitrouter");
+          .some((m) => m.provider === PROVIDER_ID);
       }
     }
     // Prominent prompt while unauthenticated; cleared once a catalog exists.

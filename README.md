@@ -1,9 +1,10 @@
 # @bitrouter/pi
 
 A [pi package](https://pi.dev/docs/latest/packages) that registers a `bitrouter`
-provider in [pi](https://pi.dev). It discovers the available models from your
-BitRouter instance at startup — there is no model list to maintain — and, on
-cloud, runs an OAuth device-authorization login from inside pi.
+provider in [pi](https://pi.dev). It selects `bitrouter/auto` for you, discovers
+the available models from your BitRouter instance at startup — there is no model
+list to maintain — and, on cloud, runs an OAuth device-authorization login from
+inside pi.
 
 BitRouter can run two ways:
 
@@ -92,13 +93,50 @@ you have run `bitrouter auth login` on this machine:
 | macOS | `$HOME/.local/share/bitrouter/account-credentials.json` |
 | Windows | `%LOCALAPPDATA%\bitrouter\data\account-credentials.json` |
 
+## The auto route
+
+`bitrouter/auto` hands model choice back to BitRouter: the request carries
+`auto` as its model and the gateway's routing policy picks the model per
+request. It leads every catalog the extension registers, and it is what
+`session_start` selects when you have not chosen a model yourself.
+
+The rest of the catalog is still there. `bitrouter/auto` is the default, not
+the only option — `/model` lists everything BitRouter serves, so pin
+`anthropic/claude-opus-5` (or anything else) whenever you want one specific
+model, and switch back whenever you do not.
+
+Until BitRouter's own catalog lists `auto`, the extension synthesizes the entry
+with deliberately conservative capacities (128K context, 16K output). They are
+the floor rather than the ceiling on purpose — `auto` may land on any model in
+the ladder, and under-claiming compacts a session early where over-claiming
+fails a request outright, mid-turn. The moment `/v1/models` serves an `auto`
+entry of its own, that entry wins and carries the real numbers with no release
+here.
+
 ## Model discovery
 
 At startup the extension calls `GET ${baseUrl}/models` and maps each model into
 pi's Model shape (id, name, reasoning, input modalities, contextWindow,
-maxTokens, cost). If the endpoint is unreachable or returns an empty list, the
-provider is not registered. On session start a capable default model is
-selected — but only when you have not already chosen one yourself.
+maxTokens, cost).
+
+The two data planes answer differently, and the extension reads each on its own
+terms:
+
+| | Local daemon | BitRouter Cloud |
+|---|---|---|
+| Body | `{ id, object, providers: [...] }` | the full catalog |
+| Context window | not sent — defaults to 128K | `max_input_tokens` |
+| Cost | not sent — reads as 0 | `pricing`, per million tokens |
+| Reasoning / tools | not sent | `capabilities` tokens |
+
+Neither plane sends `context_window`, a flat `cost` object, or `reasoning` and
+`tool_call` booleans; earlier releases read those names and so showed every
+cloud model at the default context window and priced at zero.
+
+If the endpoint is unreachable the provider is not registered — a provider whose
+every request fails is worse than no provider. A gateway that answers with an
+empty catalog is a different case: it is up, so `bitrouter/auto` stays
+selectable.
 
 ## MCP
 
@@ -119,6 +157,12 @@ to expose them, then point pi's MCP client at that endpoint.
   `bitrouter start`.
 - Both modes: check that `BITROUTER_BASE_URL`, if set, points at a reachable
   BitRouter instance.
+
+**Only `bitrouter/auto` is listed**
+
+The gateway answered with an empty catalog. The auto route still works —
+routing is the gateway's job — but `/model` will have nothing else to offer
+until the catalog fills in.
 
 **Cloud model discovery fails**
 
