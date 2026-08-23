@@ -105,7 +105,7 @@ describe("bitrouter provider extension (local)", () => {
     });
     // three discovered + the auto route at the head
     expect(config.models).toHaveLength(4);
-    expect(config.models[0].id).toBe("auto");
+    expect(config.models[0].id).toBe("bitrouter/auto");
   });
 
   it("uses an explicit BITROUTER_API_KEY when present", async () => {
@@ -122,12 +122,12 @@ describe("bitrouter provider extension (local)", () => {
     await bitrouterExtension(t.pi);
     expect(t.on).toHaveBeenCalledWith("session_start", expect.any(Function));
 
-    const found = { id: "auto", provider: "bitrouter" };
+    const found = { id: "bitrouter/auto", provider: "bitrouter" };
     const find = vi.fn(() => found);
     await t.getSessionStart()!({}, { model: undefined, modelRegistry: { find } });
 
     // Deferring the choice to BitRouter is the point of routing through it.
-    expect(find).toHaveBeenCalledWith("bitrouter", "auto");
+    expect(find).toHaveBeenCalledWith("bitrouter", "bitrouter/auto");
     expect(t.setModel).toHaveBeenCalledWith(found);
   });
 
@@ -172,7 +172,7 @@ describe("bitrouter provider extension (local)", () => {
     // The daemon answered — it is up, it just has no catalog to show. Routing
     // is the gateway's job, so `bitrouter/auto` stays selectable.
     const config = t.registerProvider.mock.calls[0][1];
-    expect(config.models.map((m: { id: string }) => m.id)).toEqual(["auto"]);
+    expect(config.models.map((m: { id: string }) => m.id)).toEqual(["bitrouter/auto"]);
   });
 
   it("registers nothing when an explicit local daemon is unreachable", async () => {
@@ -207,7 +207,7 @@ describe("smart default (no explicit BITROUTER_TARGET)", () => {
     await bitrouterExtension(t.pi);
     const config = t.registerProvider.mock.calls[0][1];
     expect(config.oauth?.name).toBe("BitRouter"); // cloud path
-    expect(config.models.map((m: { id: string }) => m.id)).toEqual(["auto"]);
+    expect(config.models.map((m: { id: string }) => m.id)).toEqual(["bitrouter/auto"]);
   });
 });
 
@@ -227,7 +227,7 @@ describe("bitrouter provider extension (cloud)", () => {
     expect(config.oauth?.name).toBe("BitRouter");
     // The auto route is offered before any token exists; pi's getAvailable()
     // still hides the provider until a credential resolves.
-    expect(config.models.map((m: { id: string }) => m.id)).toEqual(["auto"]);
+    expect(config.models.map((m: { id: string }) => m.id)).toEqual(["bitrouter/auto"]);
     expect(config.apiKey).toBeUndefined(); // no token yet → /login supplies it
     expect(
       config.oauth.getApiKey({ access: "acc", refresh: "r", expires: 0 }),
@@ -274,7 +274,7 @@ describe("bitrouter provider extension (cloud)", () => {
       // login() re-registered the provider with the discovered catalog + token.
       const last = t.registerProvider.mock.calls.at(-1)![1];
       expect(last.models).toHaveLength(4); // three discovered + auto
-      expect(last.models[0].id).toBe("auto");
+      expect(last.models[0].id).toBe("bitrouter/auto");
       expect(last.apiKey).toBe("acc_live");
     } finally {
       vi.useRealTimers();
@@ -320,7 +320,7 @@ describe("bitrouter provider extension (cloud)", () => {
     const config = t.registerProvider.mock.calls[0][1];
 
     const setWidget = vi.fn();
-    const model = { id: "auto", provider: "bitrouter" };
+    const model = { id: "bitrouter/auto", provider: "bitrouter" };
     // session_start captures ctx.ui + registry and paints the banner (no catalog yet).
     await t.getSessionStart()!(
       {},

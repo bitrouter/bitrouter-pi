@@ -96,8 +96,10 @@ you have run `bitrouter auth login` on this machine:
 ## The auto route
 
 `bitrouter/auto` hands model choice back to BitRouter: the request carries
-`auto` as its model and the gateway's routing policy picks the model per
-request. It leads every catalog the extension registers, and it is what
+`bitrouter/auto` as its model and the gateway's routing policy picks the model
+per request. `bitrouter/` is a namespace BitRouter reserves for itself, so the
+vendor segment names the router being addressed rather than the token
+destination. It leads every catalog the extension registers, and it is what
 `session_start` selects when you have not chosen a model yourself.
 
 The rest of the catalog is still there. `bitrouter/auto` is the default, not
@@ -105,12 +107,14 @@ the only option — `/model` lists everything BitRouter serves, so pin
 `anthropic/claude-opus-5` (or anything else) whenever you want one specific
 model, and switch back whenever you do not.
 
-Until BitRouter's own catalog lists `auto`, the extension synthesizes the entry
+Until BitRouter's own catalog lists `bitrouter/auto`, the extension synthesizes the entry
 with deliberately conservative capacities (128K context, 16K output). They are
 the floor rather than the ceiling on purpose — `auto` may land on any model in
 the ladder, and under-claiming compacts a session early where over-claiming
-fails a request outright, mid-turn. The moment `/v1/models` serves an `auto`
-entry of its own, that entry wins and carries the real numbers with no release
+fails a request outright, mid-turn. A gateway that ever serves an entry under
+this id supersedes the placeholder, though none does today: the namespace is
+resolved before any provider lookup and BitRouter's registry validator
+refuses catalog models under `bitrouter/`, so the entry has to come from
 here.
 
 ## Model discovery

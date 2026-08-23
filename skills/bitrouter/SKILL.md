@@ -71,8 +71,8 @@ banner stays up until `/login` runs.
 
 ## 3. The auto route and model discovery
 
-`bitrouter/auto` is the default. It carries `auto` as the request's model and
-lets BitRouter's routing policy pick the model per request; it leads every
+`bitrouter/auto` is the default. It carries `bitrouter/auto` as the request's model
+and lets BitRouter's routing policy pick the model per request; it leads every
 catalog the extension registers, and `session_start` selects it when the user
 has not already chosen a model that is still available.
 

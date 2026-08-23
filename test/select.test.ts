@@ -19,8 +19,8 @@ describe("selectDefaultModelId", () => {
   });
 
   it("prefers the auto route over every named family", () => {
-    const models = [model("claude-opus-4-8"), model("auto"), model("gpt-5")];
-    expect(selectDefaultModelId(models)).toBe("auto");
+    const models = [model("claude-opus-4-8"), model("bitrouter/auto"), model("gpt-5")];
+    expect(selectDefaultModelId(models)).toBe("bitrouter/auto");
   });
 
   it("falls back to the preference list when no auto route is served", () => {
