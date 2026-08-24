@@ -50,7 +50,7 @@
     "schema:check": "node scripts/refresh-schema.mjs --check"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.80.1",
+    "@earendil-works/pi-coding-agent": "^0.84.2",
     "@types/node": "^26.2.0",
     "ajv": "^8.20.0",
     "typescript": "^7.0.2",
