@@ -22,8 +22,12 @@
     "provider"
   ],
   "pi": {
-    "extensions": ["./extensions"],
-    "skills": ["./skills"]
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ]
   },
   "files": [
     "extensions",
@@ -41,11 +45,14 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "schema:refresh": "node scripts/refresh-schema.mjs",
+    "schema:check": "node scripts/refresh-schema.mjs --check"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.80.1",
     "@types/node": "^20.0.0",
+    "ajv": "^8.20.0",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0"
   }
