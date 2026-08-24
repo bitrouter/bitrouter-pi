@@ -69,17 +69,29 @@ Two shortcuts skip `/login` when a token already exists:
 An expired or missing credential file is not an error — it just means the login
 banner stays up until `/login` runs.
 
-## 3. Model discovery
+## 3. The auto route and model discovery
+
+`bitrouter/auto` is the default. It carries `bitrouter/auto` as the request's model
+and lets BitRouter's routing policy pick the model per request; it leads every
+catalog the extension registers, and `session_start` selects it when the user
+has not already chosen a model that is still available.
+
+It is the default, not the only option — the full catalog is registered behind
+it, so `/model` can pin any specific model BitRouter serves.
 
 On startup the extension calls `GET ${baseUrl}/models` and maps each entry to
 pi's Model shape (id, name, reasoning, input modalities, contextWindow,
-maxTokens, cost). On a **local** target, zero models means the provider is not
-registered — check that the daemon is running and that `BITROUTER_BASE_URL`
-points at the correct host. On **cloud**, the provider is registered anyway so
-that `/login` is available; the catalog fills in once a token lands.
+maxTokens, cost). The two planes answer differently: the local daemon sends
+`{ id, object, providers }` and nothing more, while cloud sends
+`max_input_tokens`, `pricing` (per million tokens), and `capabilities` tokens
+such as `reasoning` and `tools`. Neither sends `context_window`, a flat `cost`
+object, or boolean capability fields.
 
-At session start a capable default model is selected, but only when the user
-has not already chosen one that is still available.
+An **unreachable** endpoint means the provider is not registered — check that
+the daemon is running and that `BITROUTER_BASE_URL` points at the correct host.
+An endpoint that answers with an empty catalog still registers, with the auto
+route alone. On **cloud** the provider is registered regardless so that
+`/login` is available; the catalog fills in once a token lands.
 
 ## 4. MCP
 

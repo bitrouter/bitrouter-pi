@@ -19,4 +19,28 @@ export const bitrouter = {
   },
 } as const;
 
+/** The pi provider id this package registers. */
+export const PROVIDER_ID = "bitrouter";
+
+/**
+ * The model id that hands model choice back to BitRouter.
+ *
+ * `bitrouter/` is a namespace BitRouter reserves for itself
+ * (`RESERVED_NAMESPACE` in `crates/bitrouter-sdk/src/config/presets.rs`), and
+ * `bitrouter/auto` is the public slug for policy-driven automatic routing
+ * (`AUTO_SLUG`). The vendor segment names the *router being addressed*, not the
+ * token destination: the request is still fulfilled by whichever upstream
+ * provider the bound policy selects.
+ *
+ * This is the id as it travels on the wire, so it is the id this plugin
+ * advertises. The gateway never lists it in `GET /v1/models` — the namespace is
+ * resolved before any provider lookup, and BitRouter's registry validator
+ * refuses catalog models under `bitrouter/` so it can never be shadowed — which
+ * is why this plugin has to supply the entry itself.
+ *
+ * It resolves only where a preset named `auto` is bound to a routing policy;
+ * without one the gateway answers 400 naming `bitrouter optimize setup`.
+ */
+export const AUTO_MODEL_ID = "bitrouter/auto";
+
 export type BitrouterConstants = typeof bitrouter;

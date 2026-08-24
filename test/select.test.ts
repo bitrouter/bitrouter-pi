@@ -18,6 +18,16 @@ describe("selectDefaultModelId", () => {
     expect(selectDefaultModelId([])).toBeUndefined();
   });
 
+  it("prefers the auto route over every named family", () => {
+    const models = [model("claude-opus-4-8"), model("bitrouter/auto"), model("gpt-5")];
+    expect(selectDefaultModelId(models)).toBe("bitrouter/auto");
+  });
+
+  it("falls back to the preference list when no auto route is served", () => {
+    const models = [model("deepseek-v3"), model("claude-opus-4-8")];
+    expect(selectDefaultModelId(models)).toBe("claude-opus-4-8");
+  });
+
   it("prefers a capable family over the cheapest listed model", () => {
     const models = [model("deepseek-v3"), model("claude-opus-4-8"), model("gpt-4o")];
     expect(selectDefaultModelId(models)).toBe("claude-opus-4-8");
